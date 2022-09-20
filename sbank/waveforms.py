@@ -524,6 +524,26 @@ class SEOBNRv4ROMTemplate(SEOBNRv4Template):
     approximant = "SEOBNRv4_ROM"
 
 
+class SEOBNRv4ROMNRTidalv2Template(SEOBNRv4Template):
+    approximant = "SEOBNRv4_ROM_NRTidalv2"
+
+    param_names = ("m1", "m2", "spin1z", "spin2z", "lambda1", "lambda2")
+    param_formats = ("%.2f", "%.2f", "%.2f", "%.2f", "%.2f", "%.2f")
+
+    __slots__ = param_names + ("chieff", "tau0", "tau0_40", "flow", "_dur", "_mchirp", "_wf", "_metric", "sigmasq","is_seed_point", "_f_final", "_fhigh_max") 
+
+    def __init__(self, m1, m2, spin1z, spin2z, lambda1, lambda2, bank, flow=None, duration=None):
+             
+        AlignedSpinTemplate.__init__(self, m1, m2, spin1z, spin2z, bank, flow=flow, duration=duration)
+
+        self.lambda1 = float(lambda1)
+        self.lambda2 = float(lambda2)
+
+
+class SEOBNRv4ROMNRTidalv2NSBHTemplate(SEOBNRv4ROMNRTidalv2Template):
+    approximant = "SEOBNRv4_ROM_NRTidalv2_NSBH" 
+
+
 class EOBNRv2Template(SEOBNRv2Template):
     approximant = "EOBNRv2"
     param_names = ("m1", "m2")
@@ -997,6 +1017,8 @@ waveforms = {
     "SEOBNRv2_ROM_DoubleSpin_HI": SEOBNRv2ROMDoubleSpinHITemplate,
     "SEOBNRv4": SEOBNRv4ROMTemplate,
     "SEOBNRv4_ROM": SEOBNRv4ROMTemplate,
+    "SEOBNRv4_ROM_NRTidalv2": SEOBNRv4ROMNRTidalv2Template,
+    "SEOBNRv4_ROM_NRTidalv2_NSBH": SEOBNRv4ROMNRTidalv2NSBHTemplate,
     "EOBNRv2": EOBNRv2Template,
     "SpinTaylorT4": SpinTaylorT4Template,
     "SpinTaylorT5": SpinTaylorT5Template,

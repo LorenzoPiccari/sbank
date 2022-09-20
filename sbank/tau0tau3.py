@@ -241,7 +241,6 @@ def mchirpm1_to_m2(mc, m1, tol=1e-6):
 
     return m2
 
-
 def tau0tau3_bound(flow, **constraints):
     '''
     For a given set of constraints on the m1-m2 parameter space,
@@ -569,6 +568,77 @@ def aligned_spin_param_generator(flow, tmplt_class, bank, **kwargs):
             continue
         yield t
 
+#Fix argument order
+def aligned_spin_tidal_def_param_generator(flow, tmplt_class, bank, **kwargs):
+    """
+    Specify the min and max mass of the bigger component, the min and
+    max mass of the total mass and the min and max values for the
+    z-axis spin angular momentum, the tov_file relative to the chosen EOS
+    """
+
+    dur_min, dur_max = kwargs.pop('duration', (None, None))
+
+    # define a helper function to apply the appropriate spin bounds.
+    # since in the script the 'ns_bh_boundary_mass' option is required if an EOS tov_file
+    # is given, checking if 'ns_bh_boundary_mass' is in kwargs is not needed here 
+    if 'bh_spin' in kwargs and 'ns_spin' in kwargs:
+        bh_spin_bounds = kwargs.pop('bh_spin')
+        ns_spin_bounds = kwargs.pop('ns_spin')
+        ns_bh_boundary = kwargs.pop('ns_bh_boundary_mass')
+
+        def spin_bounds(mass1, mass2):
+            return (bh_spin_bounds if mass1 > ns_bh_boundary else ns_spin_bounds), \
+                   (bh_spin_bounds if mass2 > ns_bh_boundary else ns_spin_bounds)
+    else:
+        spin1b = kwargs.pop('spin1', (-1., 1.))
+        spin2b = kwargs.pop('spin2', (-1., 1.))
+
+        def spin_bounds(mass1, mass2):
+            return spin1b, spin2b
+
+    #reading the tov-file
+    tov_file = kwargs.pop('tov_file')
+    eos_data = numpy.loadtxt(tov_file)
+    mass_from_file = eos_data[:,0]
+    lambda_from_file = eos_data[:,1]
+
+
+    # FIXME: controllare a livello di script che ns_bh_boundary_mass sia passato come argomento se lo e' tov_file
+
+    # define a helper function to compute lambda from a given mass value:  
+    # adapted from pycbc.conversions.py
+    def lambda_from_masses(mass):
+        lambda_value = numpy.interp(mass, mass_from_file, lambda_from_file, 0., 0.) 
+        return lambda_value if mass <= ns_bh_boundary else 0.
+
+    # the rest will be checked in the call to urand_tau0tau3_generator
+    for mass1, mass2 in urand_tau0tau3_generator(flow, **kwargs):
+
+        spin1_bounds, spin2_bounds = spin_bounds(mass1, mass2)
+
+        mtot = mass1 + mass2
+        chis_min = (mass1*spin1_bounds[0] + mass2*spin2_bounds[0])/mtot
+        chis_max = (mass1*spin1_bounds[1] + mass2*spin2_bounds[1])/mtot
+        chis = uniform(chis_min, chis_max)
+
+        s2min = max(spin2_bounds[0], (mtot*chis - mass1*spin1_bounds[1])/mass2)
+        s2max = min(spin2_bounds[1], (mtot*chis - mass1*spin1_bounds[0])/mass2)
+
+        spin2 = uniform(s2min, s2max)
+        spin1 = (chis*mtot - mass2*spin2)/mass1
+
+        lamb1max = lambda_from_masses(mass1) 
+        lamb2max = lambda_from_masses(mass2)
+        
+        lamb1 = 0. if lamb1max == 0 else uniform(0., lamb1max)
+        lamb2 = 0. if lamb2max == 0 else uniform(0., lamb2max)
+
+        t = tmplt_class(mass1, mass2, spin1, spin2, lamb1, lamb2, bank=bank)
+        if (dur_min is not None and t.dur < dur_min) \
+                or (dur_max is not None and t.dur > dur_max):
+            continue
+        yield t
+
 
 def double_spin_precessing_param_generator(flow, tmplt_class, bank, **kwargs):
     """
@@ -662,6 +732,8 @@ proposals = {
     "SEOBNRv2_ROM_DoubleSpin_HI": aligned_spin_param_generator,
     "SEOBNRv4": aligned_spin_param_generator,
     "SEOBNRv4_ROM": aligned_spin_param_generator,
+    "SEOBNRv4_ROM_NRTidalv2": aligned_spin_tidal_def_param_generator,
+    "SEOBNRv4_ROM_NRTidalv2_NSBH": aligned_spin_tidal_def_param_generator, 
     "SpinTaylorT4": SpinTaylorT4_param_generator,
     "SpinTaylorF2": single_spin_precessing_param_generator,
     "SpinTaylorT5Fourier": double_spin_precessing_param_generator,

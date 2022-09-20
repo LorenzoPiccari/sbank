@@ -165,6 +165,11 @@ def parse_command_line():
     parser.add_option("--mtotal-max", help="Set maximum total mass of the system.",  type="float", metavar="MASS")
     parser.add_option("--mratio-min", dest="qmin", help="Set minimum allowed mass ratio of the system (convention is that q=m1/m2).", metavar="RATIO", type="float", default=1.0)
     parser.add_option("--mratio-max", dest="qmax", help="Set maximum allowed mass ratio of the system (convention is that q=m1/m2).", metavar="RATIO", type="float")
+    
+    #
+    # tidal deformations options
+    #
+    parser.add_option("--tov-file", help="Mass-lambda file for a specific neutron star EOS") 
 
     #
     # spin parameter options
@@ -174,7 +179,7 @@ def parse_command_line():
     parser.add_option("--spin2-min", help="Set minimum allowed value for the spin of the second component. If not specified, the spin2 limits will equal the spin1 limits.", type="float", default = None, metavar="SPIN")
     parser.add_option("--spin2-max", help="Set maximum allowed value for the spin of the second component.", type="float", default = None, metavar="SPIN")
     parser.add_option("--aligned-spin", action="store_true", default=False, help="Only generate templates whose spins are parallel to the orbital angular momentum.")
-    parser.add_option("--ns-bh-boundary-mass", type=float, metavar="MASS", help="Use spin bounds based on whether the object is a black hole or a neutron star. Objects with mass smaller (larger) than the given value are considered NSs (BHs) and use spin bounds given by --ns-spin-{min,max} (--bh-spin-{min,max}) rather than --spin{1,2}-{min,max}.")
+    parser.add_option("--ns-bh-boundary-mass", type=float, metavar="MASS", help="Use spin bounds based on whether the object is a black hole or a neutron star. Objects with mass smaller (larger) than the given value are considered NSs (BHs) and use spin bounds given by --ns-spin-{min,max} (--bh-spin-{min,max}) rather than --spin{1,2}-{min,max}.It is required if --tov-file is given, for BHs the tidal deformability is set to zero, for NSs it is uniformly chosen between zero and the value computed with the given tov-file")
     parser.add_option("--bh-spin-min", type=float, metavar="SPIN", help="Minimum spin for black holes when using --ns-bh-boundary-mass.")
     parser.add_option("--bh-spin-max", type=float, metavar="SPIN", help="Maximum spin for black holes when using --ns-bh-boundary-mass.")
     parser.add_option("--ns-spin-min", type=float, metavar="SPIN", help="Minimum spin for neutron stars when using --ns-bh-boundary-mass.")
@@ -258,6 +263,9 @@ def parse_command_line():
         parser.error("NSBH spin bounds require --ns-bh-boundary-mass")
     if opts.ns_bh_boundary_mass is not None and not any_nsbh_spin_opts:
         parser.error("--ns-bh-boundary-mass requires NSBH spin bounds (--bh-spin-* etc)")
+   
+    if opts.tov_file and opts.ns_bh_boundary_mass is None:
+        parser.error("--ns-bh-boundary-mass is required if --tov-file is given")
 
     if all_numeric_spin_opts:
         if not -1 <= opts.spin1_min <= opts.spin1_max <=1:
@@ -511,6 +519,9 @@ else:
         params['spin2'] = (opts.spin2_min, opts.spin2_max)
     if opts.duration_min is not None or opts.duration_max is not None:
         params['duration'] = (opts.duration_min, opts.duration_max)
+    
+    if opts.tov_file is not None:
+        params['tov_file'] = opts.tov_file
 
     # get the correct generator for the chosen approximant
     proposal = proposals[opts.approximant](opts.flow, tmplt_class, bank,
