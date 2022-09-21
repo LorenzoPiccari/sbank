@@ -169,7 +169,7 @@ def parse_command_line():
     #
     # tidal deformations options
     #
-    parser.add_option("--tov-file", help="Mass-lambda file for a specific neutron star EOS") 
+    parser.add_option("--tov-file", help="Mass-lambda file for a specific neutron star EOS. The ns-bh boundary mass for computing lambda values for tidal deformations is assumed to be the maximum value of the mass in this file.") 
 
     #
     # spin parameter options
@@ -179,11 +179,11 @@ def parse_command_line():
     parser.add_option("--spin2-min", help="Set minimum allowed value for the spin of the second component. If not specified, the spin2 limits will equal the spin1 limits.", type="float", default = None, metavar="SPIN")
     parser.add_option("--spin2-max", help="Set maximum allowed value for the spin of the second component.", type="float", default = None, metavar="SPIN")
     parser.add_option("--aligned-spin", action="store_true", default=False, help="Only generate templates whose spins are parallel to the orbital angular momentum.")
-    parser.add_option("--ns-bh-boundary-mass", type=float, metavar="MASS", help="Use spin bounds based on whether the object is a black hole or a neutron star. Objects with mass smaller (larger) than the given value are considered NSs (BHs) and use spin bounds given by --ns-spin-{min,max} (--bh-spin-{min,max}) rather than --spin{1,2}-{min,max}.It is required if --tov-file is given, for BHs the tidal deformability is set to zero, for NSs it is uniformly chosen between zero and the value computed with the given tov-file")
-    parser.add_option("--bh-spin-min", type=float, metavar="SPIN", help="Minimum spin for black holes when using --ns-bh-boundary-mass.")
-    parser.add_option("--bh-spin-max", type=float, metavar="SPIN", help="Maximum spin for black holes when using --ns-bh-boundary-mass.")
-    parser.add_option("--ns-spin-min", type=float, metavar="SPIN", help="Minimum spin for neutron stars when using --ns-bh-boundary-mass.")
-    parser.add_option("--ns-spin-max", type=float, metavar="SPIN", help="Maximum spin for neutron stars when using --ns-bh-boundary-mass.")
+    parser.add_option("--ns-bh-boundary-mass", type=float, metavar="MASS", help="Use spin bounds based on whether the object is a black hole or a neutron star. Objects with mass smaller (larger) than the given value are considered NSs (BHs) and use spin bounds given by --ns-spin-{min,max} (--bh-spin-{min,max}) rather than --spin{1,2}-{min,max}. Notice that this is in conflict with --tov-file. If --tov-file is given, the ns-bh boundary mass is assumed to be the maximum value in the file ")
+    parser.add_option("--bh-spin-min", type=float, metavar="SPIN", help="Minimum spin for black holes when using --ns-bh-boundary-mass or --tov-file.")
+    parser.add_option("--bh-spin-max", type=float, metavar="SPIN", help="Maximum spin for black holes when using --ns-bh-boundary-mass or --tov-file.")
+    parser.add_option("--ns-spin-min", type=float, metavar="SPIN", help="Minimum spin for neutron stars when using --ns-bh-boundary-mass or --tov-file.")
+    parser.add_option("--ns-spin-max", type=float, metavar="SPIN", help="Maximum spin for neutron stars when using --ns-bh-boundary-mass or --tov-file.")
 
     #
     # initial condition options
@@ -259,13 +259,13 @@ def parse_command_line():
 
     if any_numeric_spin_opts and any_nsbh_spin_opts:
         parser.error("conflicting specification of spin bounds")
-    if any_nsbh_spin_opts and opts.ns_bh_boundary_mass is None:
-        parser.error("NSBH spin bounds require --ns-bh-boundary-mass")
-    if opts.ns_bh_boundary_mass is not None and not any_nsbh_spin_opts:
-        parser.error("--ns-bh-boundary-mass requires NSBH spin bounds (--bh-spin-* etc)")
+    if any_nsbh_spin_opts and opts.ns_bh_boundary_mass is None and opts.tov_file is None:
+        parser.error("NSBH spin bounds require --ns-bh-boundary-mass or --tov-file")
+    if opts.ns_bh_boundary_mass is not None and opts.tov_file is not None and not any_nsbh_spin_opts:
+        parser.error("--ns-bh-boundary-mass and tov-file requires NSBH spin bounds (--bh-spin-* etc)")
    
-    if opts.tov_file and opts.ns_bh_boundary_mass is None:
-        parser.error("--ns-bh-boundary-mass is required if --tov-file is given")
+    if opts.tov_file and opts.ns_bh_boundary_mass is not None:
+        parser.error("conflicting specification of ns-bh-boundary. If you need tidal defomartions for NSs use only --tov-file, otherwise use --ns-bh-boundary_mass")
 
     if all_numeric_spin_opts:
         if not -1 <= opts.spin1_min <= opts.spin1_max <=1:
@@ -510,19 +510,36 @@ else:
           'mratio': (opts.qmin, opts.qmax),
           'mchirp': (opts.mchirp_min, opts.mchirp_max)}
 
+    if opts.ns_bh_boundary_mass is None and opts.tov_file is None:
+        params['spin1'] = (opts.spin1_min, opts.spin1_max)
+        params['spin2'] = (opts.spin2_min, opts.spin2_max)
+    
     if opts.ns_bh_boundary_mass is not None:
         params['ns_bh_boundary_mass'] = opts.ns_bh_boundary_mass
         params['bh_spin'] = (opts.bh_spin_min, opts.bh_spin_max)
         params['ns_spin'] = (opts.ns_spin_min, opts.ns_spin_max)
-    else:
-        params['spin1'] = (opts.spin1_min, opts.spin1_max)
-        params['spin2'] = (opts.spin2_min, opts.spin2_max)
+    
+    if opts.tov_file is not None:
+        eos_data = np.loadtxt(opts.tov_file)
+        eos_masses = eos_data[:,0]
+        ns_bh_bound = np.max(eos_masses)
+        params['ns_bh_boundary_mass'] = ns_bh_bound
+        params['bh_spin'] = (opts.bh_spin_min, opts.bh_spin_max)
+        params['ns_spin'] = (opts.ns_spin_min, opts.ns_spin_max)
+        params['tov_file'] = opts.tov_file
+
+#    if opts.ns_bh_boundary_mass is not None:
+#        params['ns_bh_boundary_mass'] = opts.ns_bh_boundary_mass
+#        params['bh_spin'] = (opts.bh_spin_min, opts.bh_spin_max)
+#        params['ns_spin'] = (opts.ns_spin_min, opts.ns_spin_max)
+#    else:
+#        params['spin1'] = (opts.spin1_min, opts.spin1_max)
+#        params['spin2'] = (opts.spin2_min, opts.spin2_max)
+
+
     if opts.duration_min is not None or opts.duration_max is not None:
         params['duration'] = (opts.duration_min, opts.duration_max)
     
-    if opts.tov_file is not None:
-        params['tov_file'] = opts.tov_file
-
     # get the correct generator for the chosen approximant
     proposal = proposals[opts.approximant](opts.flow, tmplt_class, bank,
                                            **params)
@@ -581,6 +598,8 @@ for tmplt in proposal:
                 row.event_id = tbl.get_next_id()
                 if opts.flow_column:
                     setattr(row, opts.flow_column, tmplt.flow)
+                #setattr(row, "alpha1", tmplt.lambda1)
+                #setattr(row, "alpha2", tmplt.lambda2)
                 tbl.append(row)
             if opts.output_filename.endswith(('.hdf', '.h5', '.hdf5')):
                 row = tmplt.to_storage_arr()
