@@ -532,12 +532,43 @@ class SEOBNRv4ROMNRTidalv2Template(SEOBNRv4Template):
 
     __slots__ = param_names + ("chieff", "tau0", "tau0_40", "flow", "_dur", "_mchirp", "_wf", "_metric", "sigmasq","is_seed_point", "_f_final", "_fhigh_max") 
 
+    hdf_dtype = SEOBNRv4Template.hdf_dtype + [("lambda1", float32), ("lambda2", float32)] 
+
     def __init__(self, m1, m2, spin1z, spin2z, lambda1, lambda2, bank, flow=None, duration=None):
              
         AlignedSpinTemplate.__init__(self, m1, m2, spin1z, spin2z, bank, flow=flow, duration=duration)
 
         self.lambda1 = float(lambda1)
         self.lambda2 = float(lambda2)
+
+    @classmethod
+    def from_sngl(cls, sngl, bank):
+        return cls(sngl.mass1, sngl.mass2,sngl.spin1z,sngl.spin2z,sngl.lambda1,sngl.lambda2, bank)
+
+    @classmethod
+    def from_dict(cls, params, idx, bank):
+        flow = float(params['f_lower'][idx])
+        if not flow > 0: 
+            flow = None 
+        duration = float(params['template_duration'][idx])
+        if not duration > 0: 
+            duration = None 
+        return cls(float(params['mass1'][idx]), float(params['mass2'][idx]),
+                   float(params['spin1z'][idx]), float(params['spin2z'][idx]),
+                   float(params['lambda1'][idx]), float(params['lambda2'][idx]),
+                   bank, flow=flow, duration=duration)
+
+    def to_sngl(self):
+        row = super(SEOBNRv4Template, self).to_sngl()
+        row.alpha1 = self.lambda1
+        row.alpha2 = self.lambda2
+        return row
+
+    def to_storage_arr(self):
+        new_tmplt = super(SEOBNRv4Template, self).to_storage_arr()
+        new_tmplt["lambda1"] = self.lambda1
+        new_tmplt["lambda2"] = self.lambda2
+        return new_tmplt
 
 
 class SEOBNRv4ROMNRTidalv2NSBHTemplate(SEOBNRv4ROMNRTidalv2Template):
