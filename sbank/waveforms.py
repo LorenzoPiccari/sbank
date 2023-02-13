@@ -570,6 +570,25 @@ class SEOBNRv4ROMNRTidalv2Template(SEOBNRv4Template):
         new_tmplt["lambda2"] = self.lambda2
         return new_tmplt
 
+    def _compute_waveform(self, df, f_final):
+ 
+        phi0 = 0  # This is a reference phase, and not an intrinsic parameter
+        debuglamb = -1.2
+        LALpars = lal.CreateDict()
+        approx = lalsim.GetApproximantFromString(self.approximant)
+        #lal.XLALSimInspiralWaveformParamsInsertTidalLambda1(LALpars, debuglamb)
+        #lal.XLALSimInspiralWaveformParamsInsertTidalLambda2(LALpars, debuglamb)
+        lal.DictInsertREAL8Value(LALpars, 'lambda1', self.lambda1)
+        lal.DictInsertREAL8Value(LALpars, 'lambda2', self.lambda2)
+        hplus_fd, hcross_fd = lalsim.SimInspiralChooseFDWaveform(
+            self.m1*MSUN_SI, self.m2*MSUN_SI,
+            0., 0., self.spin1z,
+            0., 0., self.spin2z,
+            1.e6*PC_SI, 0., phi0,
+            0., 0., 0.,
+            df, self.flow, f_final, self.flow,
+            LALpars, approx)
+        return hplus_fd
 
 class SEOBNRv4ROMNRTidalv2NSBHTemplate(SEOBNRv4ROMNRTidalv2Template):
     approximant = "SEOBNRv4_ROM_NRTidalv2_NSBH" 
@@ -664,12 +683,12 @@ class TaylorF2RedSpinTemplate(InspiralAlignedSpinTemplate):
 
 
 class TaylorF2Template(InspiralAlignedSpinTemplate):
-    approx_name = "TaylorF2"
+    approximant = "TaylorF2"
 
     def _compute_waveform(self, df, f_final):
         phi0 = 0  # This is a reference phase, and not an intrinsic parameter
         LALpars = lal.CreateDict()
-        approx = lalsim.GetApproximantFromString(self.approx_name)
+        approx = lalsim.GetApproximantFromString(self.approximant)
         hplus_fd, hcross_fd = lalsim.SimInspiralChooseFDWaveform(
             self.m1*MSUN_SI, self.m2*MSUN_SI,
             0., 0., self.spin1z,
